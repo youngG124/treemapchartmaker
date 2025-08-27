@@ -6,9 +6,9 @@ export type Item = {
 
 // 가격만 입력하면 됨
 export const ITEMS: Item[] = [
-  { id: "a", label: "A", price: 123_000 },
-  { id: "b", label: "B", price: 98_500 },
-  { id: "c", label: "C", price: 77_200 },
-  { id: "d", label: "D", price: 55_000 },
-  { id: "e", label: "E", price: 12_300 },
+  { id: "a", label: "NVDA", price: 10000 },
+  { id: "b", label: "QLD", price: 6000 },
+  { id: "c", label: "ETC stocks", price: 3000 },
+  { id: "d", label: "crypto", price: 1000 },
+  { id: "e", label: "cash", price: 1000 },
 ];

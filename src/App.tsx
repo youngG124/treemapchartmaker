@@ -1,4 +1,5 @@
-import { FC } from "react";
+// src/App.tsx
+import { FC, useMemo } from "react";
 import { CANVAS, GROUP_INDEXES } from "./mapConfig";
 import { ITEMS, type Item } from "./items";
 
@@ -11,7 +12,7 @@ type Rect = {
 
 const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
 
-// 그룹 나눔 함수
+// 그룹 나눔 함수 (정렬/토글 기능 없음)
 function treemapTwoGroups(
   width: number,
   height: number,
@@ -42,9 +43,9 @@ function treemapTwoGroups(
       anchorY += gh;
     }
 
+    // 그룹 내부: 주어진 순서 그대로 배치
     const innerItems = groupIndexes[g].map(idx => items[idx]);
-    const innerWeights = innerItems.map(i => i.price);
-    const innerTotal = sum(innerWeights);
+    const innerTotal = sum(innerItems.map(i => i.price));
 
     if (alongX) {
       // 세로 쌓기
@@ -70,11 +71,18 @@ function treemapTwoGroups(
   return rects;
 }
 
-const Treemap: FC<{ width: number; height: number; items: Item[]; groupIndexes: number[][] }> = ({
-  width, height, items, groupIndexes
-}) => {
-  const rects = treemapTwoGroups(width, height, items, groupIndexes);
-  const total = sum(items.map(i => i.price));
+const Treemap: FC<{
+  width: number;
+  height: number;
+  items: Item[];
+  groupIndexes: number[][];
+}> = ({ width, height, items, groupIndexes }) => {
+  const rects = useMemo(
+    () => treemapTwoGroups(width, height, items, groupIndexes),
+    [width, height, items, groupIndexes]
+  );
+
+  const total = useMemo(() => sum(items.map(i => i.price)), [items]);
   const colors = ["#8ecae6", "#219ebc", "#ffb703", "#fb8500", "#adb5bd"];
 
   return (
@@ -99,10 +107,25 @@ const Treemap: FC<{ width: number; height: number; items: Item[]; groupIndexes: 
 };
 
 export default function App() {
+  const btnStyle: React.CSSProperties = {
+    padding: "6px 10px",
+    borderRadius: 8,
+    border: "1px solid #ddd",
+    background: "#fff",
+    fontWeight: 600,
+    cursor: "not-allowed",
+    opacity: 0.7,
+  };
+
   return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#f8f9fa" }}>
       <div style={{ textAlign: "center" }}>
-        <h2 style={{ marginBottom: 12 }}>Treemap — Price 기반</h2>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center", marginBottom: 12 }}>
+          <h2 style={{ margin: 0 }}>Treemap — Price 기반</h2>
+          <button style={btnStyle} disabled aria-disabled="true">정렬</button>
+          <button style={btnStyle} disabled aria-disabled="true">표시형식</button>
+        </div>
+
         <Treemap
           width={CANVAS.width}
           height={CANVAS.height}

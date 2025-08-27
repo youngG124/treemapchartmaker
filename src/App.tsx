@@ -1,94 +1,80 @@
-// src/App.tsx
 import { FC } from "react";
+import { CANVAS, GROUP_INDEXES } from "./mapConfig";
+import { ITEMS, type Item } from "./items";
 
-type Rect = { x: number; y: number; w: number; h: number; weight: number; label: string; id: string };
+type Rect = {
+  x: number; y: number; w: number; h: number;
+  item: Item;
+  weight: number;  // price 기반
+  id: string;
+};
 
-// 그룹을 먼저 나누고(예: [5,4], [3,2,1]) 긴 변을 따라 그룹 면적 배분 → 각 그룹 내부는 짧은 변을 따라 분할
+const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
+
+// 그룹 나눔 함수
 function treemapTwoGroups(
   width: number,
   height: number,
-  groups: number[][]
+  items: Item[],
+  groupIndexes: number[][]
 ): Rect[] {
-  const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
-  const total = sum(groups.flat());
+  // weight = price
+  const weights = items.map(i => i.price);
+  const totalWeight = sum(weights);
+  const alongX = width >= height;
   const rects: Rect[] = [];
 
-  const alongX = width >= height; // 긴 변 방향
+  const groupWeights = groupIndexes.map(g => sum(g.map(i => weights[i])));
+  const groupFracs = groupWeights.map(gw => gw / totalWeight);
 
-  const groupTotals = groups.map(sum);
-  const gFrac = groupTotals.map((gt) => gt / total);
+  let anchorX = 0, anchorY = 0;
 
-  // 1) 먼저 그룹 영역 배분
-  // alongX면 가로로 나누고(세로 전폭), 아니면 세로로 나눔(가로 전폭)
-  let anchorX = 0;
-  let anchorY = 0;
-
-  for (let g = 0; g < groups.length; g++) {
-    let gx = anchorX, gy = anchorY, gw, gh;
+  for (let g = 0; g < groupIndexes.length; g++) {
+    let gx = anchorX, gy = anchorY, gw: number, gh: number;
 
     if (alongX) {
-      gw = g === groups.length - 1 ? width - anchorX : width * gFrac[g];
+      gw = (g === groupIndexes.length - 1) ? (width - anchorX) : width * groupFracs[g];
       gh = height;
       anchorX += gw;
     } else {
       gw = width;
-      gh = g === groups.length - 1 ? height - anchorY : height * gFrac[g];
+      gh = (g === groupIndexes.length - 1) ? (height - anchorY) : height * groupFracs[g];
       anchorY += gh;
     }
 
-    // 2) 그룹 내부 분할: 짧은 변을 따라 쌓기 (정사각형에 더 가깝게 보이도록)
-    const innerTotal = groupTotals[g];
-    const weights = groups[g];
+    const innerItems = groupIndexes[g].map(idx => items[idx]);
+    const innerWeights = innerItems.map(i => i.price);
+    const innerTotal = sum(innerWeights);
 
     if (alongX) {
-      // 그룹이 세로로 길어졌으니 내부는 세로로 쌓기 (y방향으로 분할)
+      // 세로 쌓기
       let innerY = gy;
-      for (let i = 0; i < weights.length; i++) {
-        const frac = weights[i] / innerTotal;
-        const ih = i === weights.length - 1 ? gy + gh - innerY : gh * frac;
-        rects.push({
-          x: gx,
-          y: innerY,
-          w: gw,
-          h: ih,
-          weight: weights[i],
-          label: String(weights[i]),
-          id: `g${g}-${i}`,
-        });
+      innerItems.forEach((item, i) => {
+        const frac = item.price / innerTotal;
+        const ih = (i === innerItems.length - 1) ? (gy + gh - innerY) : gh * frac;
+        rects.push({ x: gx, y: innerY, w: gw, h: ih, item, weight: item.price, id: `g${g}-${item.id}` });
         innerY += ih;
-      }
+      });
     } else {
-      // 그룹이 가로로 길어졌으니 내부는 가로로 쌓기 (x방향으로 분할)
+      // 가로 쌓기
       let innerX = gx;
-      for (let i = 0; i < weights.length; i++) {
-        const frac = weights[i] / innerTotal;
-        const iw = i === weights.length - 1 ? gx + gw - innerX : gw * frac;
-        rects.push({
-          x: innerX,
-          y: gy,
-          w: iw,
-          h: gh,
-          weight: weights[i],
-          label: String(weights[i]),
-          id: `g${g}-${i}`,
-        });
+      innerItems.forEach((item, i) => {
+        const frac = item.price / innerTotal;
+        const iw = (i === innerItems.length - 1) ? (gx + gw - innerX) : gw * frac;
+        rects.push({ x: innerX, y: gy, w: iw, h: gh, item, weight: item.price, id: `g${g}-${item.id}` });
         innerX += iw;
-      }
+      });
     }
   }
 
   return rects;
 }
 
-const Treemap: FC<{
-  width: number;
-  height: number;
-  groupA: number[];
-  groupB: number[];
-}> = ({ width, height, groupA, groupB }) => {
-  const rects = treemapTwoGroups(width, height, [groupA, groupB]);
-  const total = [...groupA, ...groupB].reduce((a, b) => a + b, 0);
-
+const Treemap: FC<{ width: number; height: number; items: Item[]; groupIndexes: number[][] }> = ({
+  width, height, items, groupIndexes
+}) => {
+  const rects = treemapTwoGroups(width, height, items, groupIndexes);
+  const total = sum(items.map(i => i.price));
   const colors = ["#8ecae6", "#219ebc", "#ffb703", "#fb8500", "#adb5bd"];
 
   return (
@@ -101,10 +87,10 @@ const Treemap: FC<{
             y={r.y + r.h / 2}
             textAnchor="middle"
             dominantBaseline="middle"
-            fontSize={14}
+            fontSize={12}
             fontWeight={700}
           >
-            {r.label} ({Math.round((r.weight / total) * 100)}%)
+            {`${r.item.label} ₩${r.item.price.toLocaleString()} (${Math.round((r.weight / total) * 100)}%)`}
           </text>
         </g>
       ))}
@@ -116,9 +102,13 @@ export default function App() {
   return (
     <div style={{ minHeight: "100vh", display: "grid", placeItems: "center", background: "#f8f9fa" }}>
       <div style={{ textAlign: "center" }}>
-        <h2 style={{ marginBottom: 12 }}>Treemap (Grouped: [5,4] | [3,2,1]) — 300×400</h2>
-        <Treemap width={800} height={600} groupA={[5, 4]} groupB={[3, 2, 1]} />
-        <p style={{ color: "#6c757d", marginTop: 8 }}>그룹1: 5,4 / 그룹2: 3,2,1</p>
+        <h2 style={{ marginBottom: 12 }}>Treemap — Price 기반</h2>
+        <Treemap
+          width={CANVAS.width}
+          height={CANVAS.height}
+          items={ITEMS}
+          groupIndexes={GROUP_INDEXES}
+        />
       </div>
     </div>
   );
